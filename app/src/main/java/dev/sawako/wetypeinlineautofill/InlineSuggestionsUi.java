@@ -498,6 +498,29 @@ final class InlineSuggestionsUi {
         return hasCandidates || (active && !newList);
     }
 
+    static Method findCandidateUpdateMethod(Class<?> candidateClass)
+            throws NoSuchMethodException {
+        Method result = null;
+        for (Method method : candidateClass.getDeclaredMethods()) {
+            Class<?>[] parameters = method.getParameterTypes();
+            if (method.getReturnType() != void.class || parameters.length != 4
+                    || parameters[0] != ArrayList.class || parameters[1] != int.class
+                    || parameters[2] != boolean.class || parameters[3] != boolean.class) {
+                continue;
+            }
+            if (result != null) {
+                throw new NoSuchMethodException("Ambiguous candidate update method in "
+                        + candidateClass.getName());
+            }
+            result = method;
+        }
+        if (result == null) {
+            throw new NoSuchMethodException("Candidate update method not found in "
+                    + candidateClass.getName());
+        }
+        return result;
+    }
+
     private static int dp(Context context, int value) {
         return Math.round(value * context.getResources().getDisplayMetrics().density);
     }

@@ -14,19 +14,21 @@
 ## 实现链路
 
 1. 在 `system_server` Hook `InputMethodInfo.isInlineSuggestionsEnabled()`，仅对 `com.tencent.wetype` 返回 `true`。
-2. 在 `com.tencent.wetype:hld` Hook `InputMethodService` 的请求与响应回调，并 Hook `WxHldService.onStartInputView()` 处理输入目标切换。
-3. 请求使用 AndroidX Autofill v1 样式；响应异步 inflate，首个 pinned 建议占用右侧槽位，其余建议放入横向滚动区。
-4. UI 优先复用 `ImeCandidateView` 的原生尺寸、背景和右侧宽度；结构不匹配时才回退到候选栏同级容器。
-5. 可滚动 `InlineContentView` 的 SurfaceControl reparent 到裁剪后的 SurfaceView，以避免建议越过右侧图标。
-6. generation 标记丢弃过期异步回调；只有至少一个建议渲染完成后才显示外壳。原生候选非空时暂停整条 Inline UI，候选清空后恢复；空响应、切换输入框、detach 和热重载时彻底清理并恢复原候选栏。
-7. 热重载前在主线程拆除 UI，重载后按稳定 Hook ID 调用 `replaceHook()`。
+2. Android 13+ 在 WeType 各进程 Hook `ApplicationInfo.isOnBackInvokedCallbackEnabled()`，等价补充 `android:enableOnBackInvokedCallback="true"`。
+3. 在 `com.tencent.wetype:hld` Hook `InputMethodService` 的请求与响应回调，并 Hook `WxHldService.onStartInputView()` 处理输入目标切换。
+4. 请求使用 AndroidX Autofill v1 样式；响应异步 inflate，首个 pinned 建议占用右侧槽位，其余建议放入横向滚动区。
+5. UI 优先复用 `ImeCandidateView` 的原生尺寸、背景和右侧宽度；结构不匹配时才回退到候选栏同级容器。
+6. 可滚动 `InlineContentView` 的 SurfaceControl reparent 到裁剪后的 SurfaceView，以避免建议越过右侧图标。
+7. generation 标记丢弃过期异步回调；只有至少一个建议渲染完成后才显示外壳。原生候选非空时暂停整条 Inline UI，候选清空后恢复；空响应、切换输入框、detach 和热重载时彻底清理并恢复原候选栏。
+8. 热重载前在主线程拆除 UI，重载后按稳定 Hook ID 调用 `replaceHook()`。
 
 ## 约束
 
-- 目标包、进程和服务类固定为 `com.tencent.wetype`、`com.tencent.wetype:hld` 和 `com.tencent.wetype.plugin.hld.WxHldService`；升级输入法后先用 JADX 重新确认。
+- 目标包、进程和服务类固定为 `com.tencent.wetype`、`com.tencent.wetype:hld` 和 `com.tencent.wetype.plugin.hld.WxHldService`；`ImeCandidateView` 候选更新入口按唯一的 `(ArrayList, int, boolean, boolean)` 签名解析，以兼容 3.5.3 的 `w()` 和 3.5.4 的 `A()`，后续升级仍需先用 JADX 重新确认。
 - 不伪造微信候选数据，不修改候选 Adapter，不依赖目标 APK 的 XML 或资源 ID。
 - 优先使用 `ImeCandidateView` 的 getter 和实际 View 层级；反射失败必须安全回退，不能影响输入法原行为。
 - 系统进程只修改 Inline Autofill 能力判断；候选 UI 逻辑只能运行在输入法进程。
+- Predictive Back opt-in 只在 Android 13+ 的 WeType 进程生效，不修改磁盘上的 APK 或 `ApplicationInfo` 字段。
 - 不得在建议尚未成功 inflate 时隐藏原候选栏，也不得在恢复时遗留空槽位、Surface 或修改后的 visibility。
 - `restarting=true` 的 `onStartInputView` 不代表新输入目标，不应清空仍有效的建议。
 - 保持 Adaptive Icon 的前景、背景及 Android 13+ monochrome 分层。

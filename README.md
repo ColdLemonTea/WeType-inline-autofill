@@ -5,6 +5,7 @@
 ## 功能
 
 - 向系统声明 WeType 支持 Inline Autofill。
+- 在 Android 13+ 为未声明的 WeType 版本启用 `OnBackInvokedCallback`。
 - 复用微信候选栏的高度、背景和布局，不修改候选数据或 Adapter。
 - 普通建议支持横向滚动，首个 pinned 建议占用右侧按钮槽位。
 - 正确处理空响应、输入框切换、异步回调、Surface 裁剪和候选栏恢复。
@@ -42,7 +43,7 @@ CI 也可以使用 `SIGNING_KEY`、`KEYSTORE_PASSWORD`、`ALIAS` 和 `KEY_PASSWO
 
 ## 兼容性
 
-候选栏集成依赖 WeType 内部的 `WxHldService` 和 `ImeCandidateView` 结构。WeType 升级后若建议不再显示，应先重新确认目标类名、getter 和实际 View 层级。
+候选栏集成已确认兼容 WeType 3.5.3 和 3.5.4；候选更新方法按参数签名解析，不依赖版本间变化的混淆方法名。WeType 后续升级若建议不再显示，应先重新确认 `WxHldService`、`ImeCandidateView`、getter 和实际 View 层级。
 
 ## License
 

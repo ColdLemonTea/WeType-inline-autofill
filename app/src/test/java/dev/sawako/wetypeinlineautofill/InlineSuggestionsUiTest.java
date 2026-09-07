@@ -1,10 +1,13 @@
 package dev.sawako.wetypeinlineautofill;
 
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
+
+import java.util.ArrayList;
 
 public class InlineSuggestionsUiTest {
     @Test
@@ -36,5 +39,20 @@ public class InlineSuggestionsUiTest {
         assertTrue(InlineSuggestionsUi.candidateActiveAfterUpdate(false, true, true));
         assertTrue(InlineSuggestionsUi.candidateActiveAfterUpdate(true, false, false));
         assertFalse(InlineSuggestionsUi.candidateActiveAfterUpdate(true, true, false));
+    }
+
+    @Test
+    public void resolvesObfuscatedCandidateUpdateBySignature() throws Exception {
+        assertEquals("renamed", InlineSuggestionsUi.findCandidateUpdateMethod(
+                CandidateUpdateFixture.class).getName());
+    }
+
+    private static final class CandidateUpdateFixture {
+        public void renamed(ArrayList<Object> candidates, int type, boolean newList,
+                            boolean hasMore) {
+        }
+
+        public void unrelated(ArrayList<Object> candidates, int type) {
+        }
     }
 }

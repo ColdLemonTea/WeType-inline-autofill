@@ -2,10 +2,12 @@ package dev.sawako.wetypeinlineautofill;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.inputmethodservice.InputMethodService;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
@@ -36,6 +38,7 @@ public final class WeTypeInlineAutofillModule extends XposedModule {
     private static final String IME_CLASS = PACKAGE_NAME + ".plugin.hld.WxHldService";
 
     private static final String ID_ENABLED = "system_wetype_inline_enabled";
+    private static final String ID_BACK_INVOKED = "wetype_back_invoked_enabled";
     private static final String ID_REQUEST = "wetype_inline_request";
     private static final String ID_RESPONSE = "wetype_inline_response";
     private static final String ID_START_INPUT = "wetype_inline_start_input";
@@ -43,6 +46,7 @@ public final class WeTypeInlineAutofillModule extends XposedModule {
 
     private String processName;
     private boolean systemHookInstalled;
+    private boolean backInvokedHookInstalled;
     private boolean imeHooksInstalled;
     private boolean candidateHookInstalled;
     private InlineSuggestionsUi inlineUi;
@@ -73,8 +77,11 @@ public final class WeTypeInlineAutofillModule extends XposedModule {
 
     @Override
     public void onPackageLoaded(XposedModuleInterface.PackageLoadedParam param) {
-        if (imeHooksInstalled || !PACKAGE_NAME.equals(param.getPackageName())
-                || !IME_PROCESS.equals(processName)) {
+        if (!PACKAGE_NAME.equals(param.getPackageName())) {
+            return;
+        }
+        installBackInvokedHook();
+        if (imeHooksInstalled || !IME_PROCESS.equals(processName)) {
             return;
         }
         try {
@@ -110,7 +117,11 @@ public final class WeTypeInlineAutofillModule extends XposedModule {
     public void onHotReloaded(XposedModuleInterface.HotReloadedParam param) {
         processName = param.getProcessName();
         int replaced = 0;
+        boolean hadBackInvokedHook = false;
         for (XposedInterface.HookHandle oldHandle : param.getOldHookHandles()) {
+            if (ID_BACK_INVOKED.equals(oldHandle.getId())) {
+                hadBackInvokedHook = true;
+            }
             XposedInterface.Hooker replacement = hookerFor(oldHandle.getId());
             if (replacement == null) {
                 oldHandle.unhook();
@@ -118,7 +129,9 @@ public final class WeTypeInlineAutofillModule extends XposedModule {
             }
             try {
                 oldHandle.replaceHook(replacement);
-                if (ID_CANDIDATES.equals(oldHandle.getId())) {
+                if (ID_BACK_INVOKED.equals(oldHandle.getId())) {
+                    backInvokedHookInstalled = true;
+                } else if (ID_CANDIDATES.equals(oldHandle.getId())) {
                     candidateHookInstalled = true;
                 }
                 replaced++;
@@ -126,12 +139,19 @@ public final class WeTypeInlineAutofillModule extends XposedModule {
                 log(Log.ERROR, TAG, "Unable to replace hook " + oldHandle.getId(), throwable);
             }
         }
+        if (!hadBackInvokedHook && (PACKAGE_NAME.equals(processName)
+                || (processName != null && processName.startsWith(PACKAGE_NAME + ":")))) {
+            installBackInvokedHook();
+        }
         log(Log.INFO, TAG, "Hot reload complete in " + processName + ", hooks=" + replaced);
     }
 
     private XposedInterface.Hooker hookerFor(String id) {
         if (ID_ENABLED.equals(id)) {
             return this::interceptInlineEnabled;
+        }
+        if (ID_BACK_INVOKED.equals(id)) {
+            return this::interceptBackInvokedEnabled;
         }
         if (ID_REQUEST.equals(id)) {
             return this::interceptRequest;
@@ -152,6 +172,15 @@ public final class WeTypeInlineAutofillModule extends XposedModule {
         Object object = chain.getThisObject();
         if (object instanceof InputMethodInfo
                 && PACKAGE_NAME.equals(((InputMethodInfo) object).getPackageName())) {
+            return true;
+        }
+        return chain.proceed();
+    }
+
+    private Object interceptBackInvokedEnabled(XposedInterface.Chain chain) throws Throwable {
+        Object object = chain.getThisObject();
+        if (object instanceof ApplicationInfo
+                && PACKAGE_NAME.equals(((ApplicationInfo) object).packageName)) {
             return true;
         }
         return chain.proceed();
@@ -202,13 +231,29 @@ public final class WeTypeInlineAutofillModule extends XposedModule {
         try {
             Class<?> candidateClass = Class.forName(
                     InlineSuggestionsUi.CANDIDATE_CLASS, false, loader);
-            Method update = candidateClass.getDeclaredMethod(
-                    "w", ArrayList.class, int.class, boolean.class, boolean.class);
+            Method update = InlineSuggestionsUi.findCandidateUpdateMethod(candidateClass);
             hook(update).setId(ID_CANDIDATES).intercept(this::interceptCandidates);
             candidateHookInstalled = true;
             log(Log.INFO, TAG, "Installed WeType candidate-state hook");
         } catch (Throwable throwable) {
             log(Log.ERROR, TAG, "Unable to hook WeType candidate updates", throwable);
+        }
+    }
+
+    @SuppressLint("BlockedPrivateApi")
+    private void installBackInvokedHook() {
+        if (backInvokedHookInstalled || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return;
+        }
+        try {
+            Method method = ApplicationInfo.class.getDeclaredMethod(
+                    "isOnBackInvokedCallbackEnabled");
+            method.setAccessible(true);
+            hook(method).setId(ID_BACK_INVOKED).intercept(this::interceptBackInvokedEnabled);
+            backInvokedHookInstalled = true;
+            log(Log.INFO, TAG, "Enabled WeType OnBackInvokedCallback opt-in");
+        } catch (Throwable throwable) {
+            log(Log.ERROR, TAG, "Unable to enable WeType OnBackInvokedCallback opt-in", throwable);
         }
     }
 
