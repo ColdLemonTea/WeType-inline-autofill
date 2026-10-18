@@ -41,6 +41,22 @@ keyPassword=your-key-password
 
 CI 也可以使用 `SIGNING_KEY`、`KEYSTORE_PASSWORD`、`ALIAS` 和 `KEY_PASSWORD` 环境变量。
 
+## GitHub Actions
+
+- `CI`：推送到 `master` 或提交 Pull Request 时，自动运行单元测试、Lint、Debug 和 R8 Release 构建；APK、R8 mapping 和检查报告保留 14 天。自动 CI 不使用签名密钥，Release APK 为未签名产物。
+- `Release`：手动触发，构建所选分支或 tag 的提交，从 Release 构建产物读取 `versionName`，直接作为发布 tag（例如 `0.2.0`）。验证签名后将 `app-release.apk` 和 `mapping.txt` 上传到对应的 GitHub Release；tag 和 Release 不存在时自动创建，重新运行会替换同名附件。
+
+手动发布前，在仓库的 **Settings → Secrets and variables → Actions** 配置：
+
+| Secret | 内容 |
+| --- | --- |
+| `KEYSTORE_BASE64` | 现有 Release keystore 文件的 Base64 编码 |
+| `KEYSTORE_PASSWORD` | keystore 密码 |
+| `ALIAS` | 签名别名 |
+| `KEY_PASSWORD` | 私钥密码 |
+
+使用与本地相同的 keystore，确保发布的 APK 可覆盖安装。在 **Actions → Release → Run workflow** 中选择要发布的分支即可，无需提前打 tag。若同名 tag 已指向其他提交，发布会失败，需要先更新 `versionName`。两个 workflow 都拉取完整 Git 历史，保持 `versionCode` 为该提交的 Git 提交数。
+
 ## 兼容性
 
 候选栏集成已确认兼容 WeType 3.5.3 和 3.5.4；候选更新方法按参数签名解析，不依赖版本间变化的混淆方法名。WeType 后续升级若建议不再显示，应先重新确认 `WxHldService`、`ImeCandidateView`、getter 和实际 View 层级。

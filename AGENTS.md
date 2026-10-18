@@ -9,6 +9,7 @@
 - `app/src/main/resources/META-INF/xposed/`：libxposed 模块声明、入口和静态作用域。
 - `app/src/main/res/`：模块名称、简介和 Adaptive Icon 资源。
 - `app/src/test/`：与 Android View 无关的建议排序和状态判断单元测试。
+- `.github/workflows/`：自动 CI 检查与构建，以及手动构建签名 Release、以产物的 `versionName` 为 tag 上传发布。
 - `apks/` 与本地日志仅用于逆向和调试，不得提交。
 
 ## 实现链路
