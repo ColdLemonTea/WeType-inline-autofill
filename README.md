@@ -1,24 +1,30 @@
-# WeType Inline Autofill
+# 微信输入法内联填充
 
-通过 libxposed API 102 为 WeType（微信输入法）补充 Android Inline Autofill 支持，让 1Password 等自动填充服务可以直接在输入法候选栏中显示建议。
+一个 Xposed 模块，让 1Password 等密码管理器的填充建议直接显示在微信输入法的候选栏中，点击即可填入账号、密码等信息。
 
 ## 功能
 
-- 向系统声明 WeType 支持 Inline Autofill。
-- 在 Android 13+ 为未声明的 WeType 版本启用 `OnBackInvokedCallback`。
-- 复用微信候选栏的高度、背景和布局，不修改候选数据或 Adapter。
-- 普通建议支持横向滚动，首个 pinned 建议占用右侧按钮槽位。
-- 正确处理空响应、输入框切换、异步回调、Surface 裁剪和候选栏恢复。
-- 支持 libxposed 热重载。
+- 在候选栏显示自动填充建议，建议较多时可左右滑动查看。
+- 输入文字时让出候选栏，正常显示输入法候选词。
+- 补充 Android 13 及以上的预测性返回支持。
 
-## 要求
+## 使用条件
 
-- Android 11（API 30）或更高版本。
+- Android 11 或更高版本。
 - 支持 libxposed API 102 的 Xposed 框架。
-- 包名为 `com.tencent.wetype` 的兼容版 WeType。
-- 已启用支持 Inline Autofill 的系统自动填充服务。
+- 微信输入法：已验证 3.5.3 和 3.5.4，其他版本尚未验证。
+- 支持键盘内联填充建议的密码管理器，例如 1Password。
 
-模块的静态作用域为 `system` 和 `com.tencent.wetype`。系统进程 Hook 仅修正能力判断，建议请求、渲染及候选栏 UI 均在 `com.tencent.wetype:hld` 中处理。
+## 安装与使用
+
+1. 安装模块 APK，在 Xposed 管理器中启用模块。
+2. 勾选推荐作用域：系统框架（`system`）和微信输入法（`com.tencent.wetype`）。
+3. 在 Android 设置中选择你使用的自动填充服务，并启用微信输入法。
+4. 首次启用后重启设备，在登录等输入框中查看填充建议。
+
+填充建议由密码管理器提供；是否出现建议，也取决于它对当前应用和输入框的支持。模块本身不提供密码管理或短信验证码识别功能。
+
+微信输入法升级后可能需要适配。如果出现问题，反馈时请附上 Android、微信输入法、Xposed 框架和密码管理器的版本，以及相关日志。
 
 ## 构建
 
@@ -41,10 +47,10 @@ keyPassword=your-key-password
 
 CI 也可以使用 `SIGNING_KEY`、`KEYSTORE_PASSWORD`、`ALIAS` 和 `KEY_PASSWORD` 环境变量。
 
-## GitHub Actions
+## 自动构建与发布
 
-- `CI`：推送到 `master` 或提交 Pull Request 时，自动运行单元测试、Lint、Debug 和 R8 Release 构建；APK、R8 mapping 和检查报告保留 14 天。自动 CI 不使用签名密钥，Release APK 为未签名产物。
-- `Release`：手动触发，构建所选分支或 tag 的提交，从 Release 构建产物读取 `versionName`，直接作为发布 tag（例如 `0.2.0`）。验证签名后将 `app-release.apk` 和 `mapping.txt` 上传到对应的 GitHub Release；tag 和 Release 不存在时自动创建，重新运行会替换同名附件。
+- `CI`：推送到 `master` 或提交 Pull Request 时运行测试、Lint 和构建。产物保留 14 天，其中 Release APK 未签名。
+- `Release`：手动运行，构建签名 APK，以 `versionName`（例如 `0.2.0`）作为 tag 发布到 GitHub Releases，并附上 R8 mapping 文件。重新运行会替换同名附件。
 
 手动发布前，在仓库的 **Settings → Secrets and variables → Actions** 配置：
 
@@ -55,12 +61,8 @@ CI 也可以使用 `SIGNING_KEY`、`KEYSTORE_PASSWORD`、`ALIAS` 和 `KEY_PASSWO
 | `ALIAS` | 签名别名 |
 | `KEY_PASSWORD` | 私钥密码 |
 
-使用与本地相同的 keystore，确保发布的 APK 可覆盖安装。在 **Actions → Release → Run workflow** 中选择要发布的分支即可，无需提前打 tag。若同名 tag 已指向其他提交，发布会失败，需要先更新 `versionName`。两个 workflow 都拉取完整 Git 历史，保持 `versionCode` 为该提交的 Git 提交数。
+使用与本地相同的 keystore，确保发布的 APK 可覆盖安装。在 **Actions → Release → Run workflow** 中选择要发布的分支即可，无需提前打 tag。若同名 tag 已指向其他提交，需要先更新 `versionName`。
 
-## 兼容性
-
-候选栏集成已确认兼容 WeType 3.5.3 和 3.5.4；候选更新方法按参数签名解析，不依赖版本间变化的混淆方法名。WeType 后续升级若建议不再显示，应先重新确认 `WxHldService`、`ImeCandidateView`、getter 和实际 View 层级。
-
-## License
+## 许可证
 
 [MIT](LICENSE)
